@@ -5,6 +5,11 @@
 #include <fcntl.h>
 #include <time.h>
 #include <pthread.h>
+#include <gtk/gtk.h>
+
+GtkWidget *entry_product;
+GtkWidget *label_status;
+
 
 
 //------------------------------------------------------------------------------------servo--v
@@ -43,6 +48,9 @@ pthread_barrier_t barrier;
 #define SERVO_FILE "servo_pos.csv"
 
 char product[120];
+
+void input_mode();
+void output_mode();
 
 
 //-----------------------------------servo present values
@@ -135,6 +143,8 @@ int angleToPwm(int angle)
 {
     return 50 + (angle * 200) / 180;
 }
+
+
 
 void save_servo_position()
 {
@@ -442,10 +452,48 @@ void fun(){
     pthread_join(t5, NULL);
    
 }
+
+
+void on_input_mode_clicked(GtkButton *button, gpointer data)
+{
+    gtk_label_set_text(GTK_LABEL(label_status), "Input Mode Started");
+    output_mode_check = 0;
+    input_mode();   // YOUR EXISTING FUNCTION
+}
+
+
+void on_output_mode_clicked(GtkButton *button, gpointer data)
+{
+    const char *text = gtk_entry_get_text(GTK_ENTRY(entry_product));
+
+    if (strlen(text) == 0) {
+        gtk_label_set_text(GTK_LABEL(label_status), "Enter product name!");
+        return;
+    }
+
+    strcpy(product, text);   // USE YOUR EXISTING VARIABLE
+    output_mode_check = 1;
+
+    gtk_label_set_text(GTK_LABEL(label_status), "Output Mode Started");
+
+    if (strcmp(product, "CDAC") == 0) {
+        selectedMode = 4;
+    } else if (strcmp(product, "Amalapuram") == 0) {
+        selectedMode = 5;
+    } else if (strcmp(product, "Hyderabad") == 0) {
+        selectedMode = 6;
+    } else if (strcmp(product, "Visakhapatnam") == 0) {
+        selectedMode = 7;
+    } else {
+        gtk_label_set_text(GTK_LABEL(label_status), "Unknown Product");
+        return;
+    }
+
+    fun();   // START SERVO THREADS
+}
 //------------------------------------------------------------------------------------servo--^
            
-void input_mode();
-void output_mode();
+
 
 
 
@@ -543,91 +591,65 @@ void load_servo_position()
 
 int choise;
 
-int main() {
-	wiringPiSetupGpio();
-
+int main(int argc, char *argv[])
+{
+    // ---------- GPIO INIT ----------
+    wiringPiSetupGpio();
     pinMode(SERVO1, PWM_OUTPUT);
     pinMode(SERVO2, PWM_OUTPUT);
-    pinMode(SERVO3, PWM_OUTPUT);	
+    pinMode(SERVO3, PWM_OUTPUT);
     pinMode(SERVO4, PWM_OUTPUT);
-	
 
-	wiringPiSetupGpio(); 
     pinMode(ledPin, OUTPUT);
-    pwmSetMode(PWM_MODE_MS);
-    pwmSetRange(2000);
-    pwmSetClock(192); 
-
     pinMode(BUTTON, INPUT);
     pullUpDnControl(BUTTON, PUD_UP);
+
+    pwmSetMode(PWM_MODE_MS);
+    pwmSetRange(2000);
+    pwmSetClock(192);
 
     pthread_barrier_init(&barrier, NULL, THREAD_COUNT);
     load_servo_position();
     go_to_rest_position_1();
-		
-		while(1){
-            go_to_rest_position_1();
-			
-		printf("1)INPUT MODE\n2)OUTPUT MODE\n3)EXIT\nSelect your option:");
-		scanf("%d",&choise);
-		while(getchar()!='\n');
-		
-		switch(choise){
-			case 1:
-				printf("input mode started\n");
-				input_mode();
-				break;
-			case 2:
-				printf("output mode started\n");
-				//pwm_fade_twice();
-				output_mode();
-				break;
-			default:
-				printf("enter valid choise!\n");
-				break;
-		}
-		
-	}
-	   pthread_barrier_destroy(&barrier);
+
+    // ---------- GTK INIT ----------
+    gtk_init(&argc, &argv);
+
+    GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+    gtk_window_set_title(GTK_WINDOW(window), "Robotic Arm Control");
+    gtk_window_set_default_size(GTK_WINDOW(window), 350, 250);
+    g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
+
+    GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+    gtk_container_add(GTK_CONTAINER(window), vbox);
+
+    GtkWidget *btn_input = gtk_button_new_with_label("Input Mode");
+    GtkWidget *btn_output = gtk_button_new_with_label("Output Mode");
+
+    entry_product = gtk_entry_new();
+    gtk_entry_set_placeholder_text(GTK_ENTRY(entry_product), "Enter Product Name");
+
+    label_status = gtk_label_new("Idle");
+
+    gtk_box_pack_start(GTK_BOX(vbox), btn_input, FALSE, FALSE, 5);
+    gtk_box_pack_start(GTK_BOX(vbox), entry_product, FALSE, FALSE, 5);
+    gtk_box_pack_start(GTK_BOX(vbox), btn_output, FALSE, FALSE, 5);
+    gtk_box_pack_start(GTK_BOX(vbox), label_status, FALSE, FALSE, 5);
+
+    g_signal_connect(btn_input, "clicked", G_CALLBACK(on_input_mode_clicked), NULL);
+    g_signal_connect(btn_output, "clicked", G_CALLBACK(on_output_mode_clicked), NULL);
+
+    gtk_widget_show_all(window);
+    gtk_main();
+
+    pthread_barrier_destroy(&barrier);
     return 0;
 }
 
+
 char product[120];
 
-void output_mode()
-{
-    go_to_rest_position_1();
-    output_mode_check=1;
-	printf("enter product:");
-	scanf("%s",product);
-	
-	product[strcspn(product, "\n")] = 0;
 
-        if (strcmp(product, "CDAC") == 0) {
-			selectedMode=4;
-			fun();
-        }
-
-        else if (strcmp(product, "Amalapuram") == 0) {
-			selectedMode=5;
-			fun();
-        }
-
-        else if (strcmp(product, "Hyderabad") == 0) {
-			selectedMode=6;
-			fun();
-        }
-
-        else if (strcmp(product, "Visakhapatnam") == 0) {
-			selectedMode=7;
-			fun();
-        }
-
-        else {
-            printf("Unknown QR\n");
-        }
-	
-}
 
 
 char buffer[120];
