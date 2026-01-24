@@ -15,6 +15,8 @@
 #define SERVO3 18
 #define SERVO4 13
 
+#define BUTTON 21
+
 #define SERVO1_REST 90
 #define SERVO2_REST 170
 #define SERVO3_REST 140
@@ -145,6 +147,20 @@ void save_servo_position()
     fclose(fp);
 }
 
+void emerg_button() {
+    int buttonState = digitalRead(BUTTON);
+
+    if (buttonState == LOW) {   // Button pressed
+      //  noInterrupts();         // Stop all interrupts (optional but recommended)
+
+        while (1) {
+            // MCU is now frozen here
+            // Nothing will execute after this
+        }
+    }
+}
+
+
 /* ---------- SERVO FUNCTIONS ---------- */
 
 void *servo1(void *arg)
@@ -157,6 +173,7 @@ void *servo1(void *arg)
         int target = angleToPwm(modes[selectedMode][0][i]);
         for (int j = current; j != target; j += (j < target ? 1 : -1))
         {
+            emerg_button();
 			if(ir_error==0){
             pwmWrite(SERVO1, j);
             servo_1=j;
@@ -186,6 +203,7 @@ void *servo2(void *arg)
         int target = angleToPwm(modes[selectedMode][1][i]);
         for (int j = current; j != target; j += (j < target ? 1 : -1))
         {
+            emerg_button();
 			if(ir_error==0){
             pwmWrite(SERVO2, j);
             servo_2=j;
@@ -213,6 +231,7 @@ void *servo3(void *arg)
         int target = angleToPwm(modes[selectedMode][2][i]);
         for (int j = current; j != target; j += (j < target ? 1 : -1))
         {
+            emerg_button();
 			if(ir_error==0){
 
             pwmWrite(SERVO3, j);
@@ -240,6 +259,7 @@ void *servo4(void *arg)
         int target = angleToPwm(modes[selectedMode][3][i]);
         for (int j = current; j != target; j += (j < target ? 1 : -1))
         {
+            emerg_button();
 			if(ir_error==0){
             pwmWrite(SERVO4, j);
             servo_4=j;
@@ -432,6 +452,10 @@ int main() {
     pwmSetMode(PWM_MODE_MS);
     pwmSetRange(2000);
     pwmSetClock(192); 
+
+    pinMode(BUTTON, INPUT);
+    pullUpDnControl(BUTTON, PUD_UP);
+
     pthread_barrier_init(&barrier, NULL, THREAD_COUNT);
     load_servo_position();
     go_to_rest_position_1();
