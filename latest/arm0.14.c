@@ -150,12 +150,9 @@ void save_servo_position()
 void emerg_button() {
     int buttonState = digitalRead(BUTTON);
 
-    if (buttonState == LOW) {   // Button pressed
-      //  noInterrupts();         // Stop all interrupts (optional but recommended)
+    if (buttonState == LOW) {   
 
         while (1) {
-            // MCU is now frozen here
-            // Nothing will execute after this
         }
     }
 }
@@ -501,10 +498,20 @@ void output_mode()
         }
 
         else if (strcmp(product, "Amalapuram") == 0) {
-		
 			selectedMode=5;
 			fun();
         }
+
+        else if (strcmp(product, "Hyderabad") == 0) {
+			selectedMode=6;
+			fun();
+        }
+
+        else if (strcmp(product, "Visakhapatnam") == 0) {
+			selectedMode=7;
+			fun();
+        }
+
         else {
             printf("Unknown QR\n");
         }
