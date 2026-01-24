@@ -32,6 +32,7 @@ int ledPin = 22;
 int ir_sensor = 26;
 
 int ir_error=0;
+int output_mode_check=0;
 
 pthread_t t1, t2, t3, t4 ,t5;
 
@@ -40,6 +41,8 @@ pthread_t t1, t2, t3, t4 ,t5;
 pthread_barrier_t barrier;
 
 #define SERVO_FILE "servo_pos.csv"
+
+char product[120];
 
 
 //-----------------------------------servo present values
@@ -156,6 +159,61 @@ void emerg_button() {
         }
     }
 }
+
+void flush_fifo() {
+    int fd = open("/tmp/qrpipe", O_RDONLY | O_NONBLOCK);
+    if (fd < 0) return;
+
+    char dump[128];
+    while (read(fd, dump, sizeof(dump)) > 0) {
+        // discard silently
+    }
+
+    close(fd);
+}
+
+int check_product_with_qr()
+{
+    printf("product cheking start..........................\n");
+    char qr_buffer[120];
+    const char *fifo_path = "/tmp/qrpipe";
+
+    while (1) {
+
+        FILE *fp = fopen(fifo_path, "r");
+        if (!fp) {
+            perror("FIFO open error");
+            return 0;
+        }
+
+        if (!fgets(qr_buffer, sizeof(qr_buffer), fp)) {
+            fclose(fp);
+            continue;
+        }
+
+        fclose(fp);
+
+        // remove newline
+        qr_buffer[strcspn(qr_buffer, "\n")] = 0;
+
+        // ignore junk
+        if (strcmp(qr_buffer, "0") == 0 || strlen(qr_buffer) < 3)
+            continue;
+
+        printf("Entered Product : %s\n", product);
+        printf("QR Scanned      : %s\n", qr_buffer);
+
+        // compare
+        if (strcmp(product, qr_buffer) == 0) {
+            flush_fifo();     // VERY IMPORTANT
+            return 1;         // match
+        } else {
+            flush_fifo();
+            return 0;         // mismatch
+        }
+    }
+}
+
 
 
 /* ---------- SERVO FUNCTIONS ---------- */
@@ -280,7 +338,7 @@ void *servo4(void *arg)
 void *magnet(void *arg)
 {
 	pinMode(ir_sensor,INPUT);
-
+if(output_mode_check==0){
 	for(int i =0;i<STEPS;i++){
 		int ir_check = digitalRead(ir_sensor);
 		int a = modes[selectedMode][4][i];
@@ -305,10 +363,70 @@ void *magnet(void *arg)
 		
 		pthread_barrier_wait(&barrier);
 	}
-	
+}else{
+    for(int i =0;i<STEPS;i++){
+		int ir_check = digitalRead(ir_sensor);
+		int a = modes[selectedMode][4][i];
+		if(a==1){
+			digitalWrite(ledPin, HIGH);
+		}else{
+			digitalWrite(ledPin, LOW);
+		}
+
+        if(i==3){     //checking the qr code for correct item is their oor not
+            if(check_product_with_qr()){
+        
+
+		if (i != 5 && i != 6){
+			//object checking 
+			if(!ir_check==a){
+				printf("object detected\n");
+				
+				
+			}else{
+				printf("errorrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr object not detected\n");
+				ir_error=1;
+                pthread_barrier_wait(&barrier);
+                continue;
+            }
+		}
+
+		pthread_barrier_wait(&barrier);
+        }
+        else{
+            printf("productr not found\n");
+				ir_error=1;
+                pthread_barrier_wait(&barrier);
+                continue;
+        }
+
+    }else{
+
+		if (i != 5 && i != 6){
+			//object checking 
+			if(!ir_check==a){
+				printf("object detected\n");
+				
+				
+			}else{
+				printf("errorrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr object not detected\n");
+				ir_error=1;
+                pthread_barrier_wait(&barrier);
+                continue;
+            }
+		}
+
+		pthread_barrier_wait(&barrier);
+
+    }
+
+    }
+}
 	return NULL;
 	
 }
+
+
 
 void fun(){
     pthread_create(&t1, NULL, servo1, NULL);
@@ -329,17 +447,7 @@ void fun(){
 void input_mode();
 void output_mode();
 
-void flush_fifo() {
-    int fd = open("/tmp/qrpipe", O_RDONLY | O_NONBLOCK);
-    if (fd < 0) return;
 
-    char dump[128];
-    while (read(fd, dump, sizeof(dump)) > 0) {
-        // discard silently
-    }
-
-    close(fd);
-}
 
 void go_to_rest_position_1()
 {
@@ -458,6 +566,7 @@ int main() {
     go_to_rest_position_1();
 		
 		while(1){
+            go_to_rest_position_1();
 			
 		printf("1)INPUT MODE\n2)OUTPUT MODE\n3)EXIT\nSelect your option:");
 		scanf("%d",&choise);
@@ -487,6 +596,8 @@ char product[120];
 
 void output_mode()
 {
+    go_to_rest_position_1();
+    output_mode_check=1;
 	printf("enter product:");
 	scanf("%s",product);
 	
@@ -578,5 +689,4 @@ void input_mode() {
 
     }
 }
-
 
