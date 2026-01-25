@@ -11,6 +11,7 @@ GtkWidget *entry_product;
 GtkWidget *label_status;
 
 
+volatile int abort_motion = 0;
 
 //------------------------------------------------------------------------------------servo--v
 
@@ -70,7 +71,7 @@ int modes[MODES][SERVOS][STEPS] =
     {
         {90,172,172,5,5,5,90},
         {170,173,149,149,159,119,170},
-        {140,40,72,72,25,110,140},
+        {140,35,68,68,25,110,140},
         {140,140,110,110,102,136,140},
         {0,0,1,1,1,0,0}
     },
@@ -79,7 +80,7 @@ int modes[MODES][SERVOS][STEPS] =
     {
         {90,172,172,25,25,25,90},
         {170,173,149,149,159,119,170},
-        {140,40,72,72,25,110,140},
+        {140,35,68,68,25,110,140},
         {140,140,120,120,102,136,140},
         {0,0,1,1,1,0,0}
     },
@@ -88,7 +89,7 @@ int modes[MODES][SERVOS][STEPS] =
     {
         {90,172,172,42,42,42,90},
         {170,173,149,149,159,119,170},
-        {140,40,72,72,25,110,140},
+        {140,35,68,68,25,110,140},
         {140,140,90,90,102,136,140},
         {0,0,1,1,1,0,0}
     },
@@ -97,7 +98,7 @@ int modes[MODES][SERVOS][STEPS] =
     {
         {90,172,172,58,58,58,90},
         {170,173,149,149,159,119,170},
-        {140,40,72,72,25,110,140},
+        {140,35,68,70,25,110,140},
         {140,140,90,90,102,136,140},
         {0,0,1,1,1,0,0}
     },
@@ -105,33 +106,33 @@ int modes[MODES][SERVOS][STEPS] =
     // MODE 11
     {
         {90,5,5,170,170,170,90},
-        {170,150,125,125,180,180,170},
-        {140,30,90,90,37,90,140},
+        {170,145,125,125,180,180,170},
+        {140,28,90,90,37,90,140},
         {140,108,108,108,138,140,140},
         {0,0,1,1,1,0,0}
     },
     // MODE 12
     {
-        {90,20,20,170,170,170,90},
-        {170,150,125,125,180,180,170},
-        {140,30,90,90,37,90,140},
-        {140,108,108,108,138,140,140},
+        {90,25,25,170,170,170,90},
+        {170,145,125,125,180,180,170},
+        {140,28,90,90,37,90,140},
+        {140,100,108,108,138,140,140},
         {0,0,1,1,1,0,0}
     },	
     // MODE 13
     {
-        {90,37,37,170,170,170,90},
-        {170,150,125,125,180,180,170},
-        {140,30,90,90,37,90,140},
-        {140,108,108,108,138,140,140},
+        {90,42,42,170,170,170,90},
+        {170,145,125,125,180,180,170},
+        {140,23,90,90,37,90,140},
+        {140,100,100,108,138,140,140},
         {0,0,1,1,1,0,0}
     },
     // MODE 14
     {
-        {90,53,53,170,170,170,90},
-        {170,150,125,125,180,180,170},
-        {140,30,90,90,37,90,140},
-        {140,108,108,108,138,140,140},
+        {90,58,58,170,170,170,90},
+        {170,145,125,125,180,180,170},
+        {140,23,90,90,37,90,140},
+        {140,100,100,108,138,140,140},
         {0,0,1,1,1,0,0}
     },
 };
@@ -349,6 +350,7 @@ void *servo4(void *arg)
 
 void go_to_rest_position_1()
 {
+    digitalWrite(ledPin,LOW);
     int target1 = angleToPwm(SERVO1_REST);
     int target2 = angleToPwm(SERVO2_REST);
     int target3 = angleToPwm(SERVO3_REST);
@@ -405,94 +407,75 @@ void go_to_rest_position_1()
 
 void *magnet(void *arg)
 {
-	pinMode(ir_sensor,INPUT);
-if(output_mode_check==0){
-	for(int i =0;i<STEPS;i++){
-		int ir_check = digitalRead(ir_sensor);
-		int a = modes[selectedMode][4][i];
-		if(a==1){
-			digitalWrite(ledPin, HIGH);
-		}else{
-			digitalWrite(ledPin, LOW);
-		}
-		if (i!=1&&i!=2&&i != 5 && i != 6){
-			//object checking 
-			if(!ir_check==a){
-				printf("object detected\n");
-				
-				
-			}else{
-				printf("errorrrr rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr object not detected\n");
-				ir_error=1;
-                pthread_barrier_wait(&barrier);
-                continue;
-            }
-		}
-		
-		pthread_barrier_wait(&barrier);
-	}
-}else{
-    for(int i =0;i<STEPS;i++){
-		int ir_check = digitalRead(ir_sensor);
-		int a = modes[selectedMode][4][i];
-		if(a==1){
-			digitalWrite(ledPin, HIGH);
-		}else{
-			digitalWrite(ledPin, LOW);
-		}
+    pinMode(ir_sensor, INPUT);
 
-        if(i==3){     //checking the qr code for correct item is their oor not
-            if(check_product_with_qr()){
-        
+    for (int i = 0; i < STEPS; i++)
+    {
+        int ir_check = digitalRead(ir_sensor);
+        int a = modes[selectedMode][4][i];
 
-		if (i!=1&&i!=2&&i != 5 && i != 6){
-			//object checking 
-			if(!ir_check==a){
-				printf("object detected\n");
-				
-				
-			}else{
-				printf("errorrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr object not detected\n");
-				ir_error=1;
-                pthread_barrier_wait(&barrier);
-                continue;
-            }
-		}
-
-		pthread_barrier_wait(&barrier);
-        }
-        else{
-            printf("productr not found\n");
-				 go_to_rest_position_1();
-                pthread_barrier_wait(&barrier);
-                continue;
+        /* --------- IF ABORT, DO NOTHING BUT SYNC --------- */
+        if (abort_motion) {
+            pthread_barrier_wait(&barrier);
+            continue;   // <-- VERY IMPORTANT
         }
 
-    }else{
+        /* --------- Magnet ON / OFF --------- */
+        digitalWrite(ledPin, a ? HIGH : LOW);
 
-		if (i!=1&&i!=2&&i != 5 && i != 6){
-			//object checking 
-			if(!ir_check==a){
-				printf("object detected\n");
-				
-				
-			}else{
-				printf("errorrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr object not detected\n");
-				 go_to_rest_position_1();
-                pthread_barrier_wait(&barrier);
-                continue;
+        /* ================= INPUT MODE ================= */
+        if (output_mode_check == 0)
+        {
+            digitalWrite(ledPin, a ? HIGH : LOW);
+            if (i != 1 && i != 2 && i != 5 && i != 6)
+            {
+                if (!ir_check == a) {
+                    printf("object detected (input mode)\n");
+                } else {
+                    printf("error: object not detected (input mode)\n");
+                    ir_error = 1;
+                    abort_motion = 1;
+                }
             }
-		}
+        }
 
-		pthread_barrier_wait(&barrier);
+        /* ================= OUTPUT MODE ================= */
+        else
+        {
+            if (i == 1)
+            {
+                if (!check_product_with_qr()) {
+                    printf("product not found\n");
+                    ir_error = 1;
+                    abort_motion = 1;
+                }
+            }
 
+            if (!abort_motion &&
+                i != 1 && i != 2 && i != 5 && i != 6)
+            {
+                if (!ir_check == a) {
+                    printf("object detected (output mode)\n");
+                } else {
+                    printf("error: object not detected (output mode)\n");
+                    ir_error = 1;
+                    abort_motion = 1;
+                }
+            }
+        }
+
+        pthread_barrier_wait(&barrier);
     }
 
+    /* ---- move to rest AFTER all barriers are done ---- */
+    if (abort_motion) {
+        go_to_rest_position_1();
     }
+
+    return NULL;
 }
-	return NULL;
-	
-}
+
+
 
 
 
@@ -517,6 +500,7 @@ void fun(){
 
 void on_input_mode_clicked(GtkButton *button, gpointer data)
 {
+    output_mode_check =1;
     gtk_label_set_text(GTK_LABEL(label_status), "Input Mode Started");
     output_mode_check = 0;
     input_mode();   // YOUR EXISTING FUNCTION
@@ -525,6 +509,7 @@ void on_input_mode_clicked(GtkButton *button, gpointer data)
 
 void on_output_mode_clicked(GtkButton *button, gpointer data)
 {
+    flush_fifo();
     go_to_rest_position_1();
     const char *text = gtk_entry_get_text(GTK_ENTRY(entry_product));
 
@@ -550,6 +535,9 @@ void on_output_mode_clicked(GtkButton *button, gpointer data)
         gtk_label_set_text(GTK_LABEL(label_status), "Unknown Product");
         return;
     }
+    abort_motion = 0;
+    ir_error = 0;
+
 
     fun();   // START SERVO THREADS
 }
@@ -714,7 +702,8 @@ void input_mode() {
         else {
             printf("Unknown QR\n");
         }
-
+            abort_motion = 0;
+             ir_error = 0;
 
     }
 }
