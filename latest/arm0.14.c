@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <gtk/gtk.h>
 #include <sys/stat.h>
+#include <signal.h>
 
 #define FIFO_PATH  "/tmp/qrpipe"
 #define DATA_FILE  "inventory_data.csv"
@@ -17,6 +18,11 @@ GtkWidget *entry_product;
 GtkWidget *label_status;
 
 volatile int abort_motion = 0;
+volatile int stop_input_mode = 0;
+
+GtkWidget *treeview_inventory;
+GtkListStore *inventory_store;
+
 
 //------------------------------------------------------------------------------------servo--v
 
@@ -45,7 +51,8 @@ int ir_sensor = 26;
 int ir_error=0;
 int output_mode_check=0;
 
-pthread_t t1, t2, t3, t4 ,t5;
+pthread_t t1, t2, t3, t4 ,t5 ,t6;
+pid_t qr_pid;
 
 #define THREAD_COUNT 5
 
@@ -55,7 +62,7 @@ pthread_barrier_t barrier;
 
 char product[120];
 
-void input_mode();
+void* input_mode();
 void output_mode();
 
 
@@ -180,6 +187,85 @@ void retrieve_item(const char *item) {
         printf("? NOT AVAILABLE: %s\n", item);
     }
 }
+
+void on_stop_clicked(GtkButton *button, gpointer data)//gtk
+{
+    stop_input_mode = 1;
+    abort_motion = 1;
+    ir_error = 1;
+
+    gtk_label_set_text(GTK_LABEL(label_status), "Stopped. Select Mode.");
+}
+
+void init_inventory_table()
+{
+    inventory_store = gtk_list_store_new(2, G_TYPE_STRING, G_TYPE_INT);
+
+    treeview_inventory = gtk_tree_view_new_with_model(GTK_TREE_MODEL(inventory_store));
+
+    GtkCellRenderer *renderer;
+
+    renderer = gtk_cell_renderer_text_new();
+    gtk_tree_view_insert_column_with_attributes(
+        GTK_TREE_VIEW(treeview_inventory), -1,
+        "Product", renderer, "text", 0, NULL);
+
+    renderer = gtk_cell_renderer_text_new();
+    gtk_tree_view_insert_column_with_attributes(
+        GTK_TREE_VIEW(treeview_inventory), -1,
+        "Count", renderer, "text", 1, NULL);
+}
+
+void load_inventory_into_table()
+{
+    gtk_list_store_clear(inventory_store);
+
+    FILE *fp = fopen(COUNT_FILE, "r");
+    if (!fp) return;
+
+    char line[128], name[64];
+    int count;
+
+    fgets(line, sizeof(line), fp); // skip header
+
+    while (fgets(line, sizeof(line), fp)) {
+        sscanf(line, "%[^,],%d", name, &count);
+
+        GtkTreeIter iter;
+        gtk_list_store_append(inventory_store, &iter);
+        gtk_list_store_set(inventory_store, &iter,
+                           0, name,
+                           1, count,
+                           -1);
+    }
+
+    fclose(fp);
+}
+
+int get_product_count(const char *item)
+{
+    FILE *fp = fopen(COUNT_FILE, "r");
+    if (!fp) return 0;
+
+    char line[128], name[64];
+    int count;
+
+    fgets(line, sizeof(line), fp); // header
+
+    while (fgets(line, sizeof(line), fp)) {
+        sscanf(line, "%[^,],%d", name, &count);
+        if (strcmp(name, item) == 0) {
+            fclose(fp);
+            return count;
+        }
+    }
+
+    fclose(fp);
+    return 0;
+}
+
+
+
 //---------------------------------------------------------------------------------------datalog-^
 
 
@@ -624,7 +710,8 @@ void on_input_mode_clicked(GtkButton *button, gpointer data)
     output_mode_check =1;
     gtk_label_set_text(GTK_LABEL(label_status), "Input Mode Started");
     output_mode_check = 0;
-    input_mode();   // YOUR EXISTING FUNCTION
+    pthread_create(&t6, NULL, input_mode, NULL);
+    pthread_detach(t6);
 }
 
 
@@ -658,14 +745,23 @@ void on_output_mode_clicked(GtkButton *button, gpointer data)
     }
     abort_motion = 0;
     ir_error = 0;
+    int count = get_product_count(product);
+
+    if (count <= 0) {
+        gtk_label_set_text(GTK_LABEL(label_status), "Product is EMPTY");
+        return;
+    }
+
 
 
     fun();
+    
 
     if (abort_motion == 0 && ir_error == 0) {
         retrieve_item(product);
         log_event(product, "RETRIEVE");
         gtk_label_set_text(GTK_LABEL(label_status), "Retrieve Successful");
+        load_inventory_into_table();
     } else {
         gtk_label_set_text(GTK_LABEL(label_status), "Retrieve Failed � Not Logged");
     }
@@ -709,6 +805,43 @@ void load_servo_position()
 }
 
 
+void start_qr_script()
+{
+    qr_pid = fork();
+
+    if (qr_pid == 0) {
+        // Child process
+        execlp("python3", "python3", "qr3.py", NULL);
+        perror("execlp failed");
+        _exit(1);
+    }
+}
+
+void stop_qr_script()
+{
+    if (qr_pid > 0) {
+        kill(qr_pid, SIGTERM);
+        qr_pid = -1;
+    }
+}
+
+gboolean on_window_close(GtkWidget *widget, GdkEvent *event, gpointer data)
+{
+    printf("Window close clicked\n");
+
+    /* ---- STOP EVERYTHING CLEANLY ---- */
+    stop_input_mode = 1;      // stop input thread
+    abort_motion = 1;         // stop servos
+    ir_error = 1;
+
+    stop_qr_script();         // ?? STOP python qr3.py
+
+    go_to_rest_position_1();  // safe servo position
+
+    gtk_main_quit();          // exit GTK loop
+
+    return TRUE;              // we handled the event
+}
 
 
 
@@ -717,6 +850,7 @@ int choise;
 
 int main(int argc, char *argv[])
 {
+    start_qr_script();
     // ---------- GPIO INIT ----------
     wiringPiSetupGpio();
     pinMode(SERVO1, PWM_OUTPUT);
@@ -741,8 +875,9 @@ int main(int argc, char *argv[])
 
     GtkWidget *window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title(GTK_WINDOW(window), "Robotic Arm Control");
-    gtk_window_set_default_size(GTK_WINDOW(window), 350, 250);
-    g_signal_connect(window, "destroy", G_CALLBACK(gtk_main_quit), NULL);
+    gtk_window_set_default_size(GTK_WINDOW(window), 380, 250);
+    g_signal_connect(window, "delete-event",G_CALLBACK(on_window_close), NULL);
+
 
     GtkWidget *vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
     gtk_container_add(GTK_CONTAINER(window), vbox);
@@ -763,6 +898,21 @@ int main(int argc, char *argv[])
     g_signal_connect(btn_input, "clicked", G_CALLBACK(on_input_mode_clicked), NULL);
     g_signal_connect(btn_output, "clicked", G_CALLBACK(on_output_mode_clicked), NULL);
 
+    GtkWidget *btn_stop = gtk_button_new_with_label("STOP");
+
+    init_inventory_table();
+    load_inventory_into_table();
+
+    GtkWidget *scrolled = gtk_scrolled_window_new(NULL, NULL);
+    gtk_widget_set_size_request(scrolled, 300, 150);
+    gtk_container_add(GTK_CONTAINER(scrolled), treeview_inventory);
+
+    gtk_box_pack_start(GTK_BOX(vbox), btn_stop, FALSE, FALSE, 5);
+    gtk_box_pack_start(GTK_BOX(vbox), scrolled, TRUE, TRUE, 5);
+
+    g_signal_connect(btn_stop, "clicked", G_CALLBACK(on_stop_clicked), NULL);
+
+
     gtk_widget_show_all(window);
     gtk_main();
 
@@ -777,13 +927,14 @@ char product[120];
 
 
 char buffer[120];
-void input_mode() {
+void* input_mode() {
     time_t t = time(NULL);
     struct tm *tm_info = localtime(&t);
     const char *fifo_path = "/tmp/qrpipe";
 
 
-    while (1) {
+    while (!stop_input_mode) {
+        stop_input_mode = 0;
         go_to_rest_position_1();
         FILE *fp = fopen(fifo_path, "r");
         if (!fp) perror("FIFO open error");
@@ -875,10 +1026,15 @@ void input_mode() {
         else {
             printf("Unknown QR\n");
         }
+
+        load_inventory_into_table();
+            
             abort_motion = 0;
              ir_error = 0;
 
     }
+    gtk_label_set_text(GTK_LABEL(label_status), "Input Mode Stopped");
+
 }
 
 
