@@ -6,10 +6,15 @@
 #include <time.h>
 #include <pthread.h>
 #include <gtk/gtk.h>
+#include <sys/stat.h>
+
+#define FIFO_PATH  "/tmp/qrpipe"
+#define DATA_FILE  "inventory_data.csv"
+#define COUNT_FILE "inventory_count.csv"
+#define TEMP_FILE  "temp.csv"
 
 GtkWidget *entry_product;
 GtkWidget *label_status;
-
 
 volatile int abort_motion = 0;
 
@@ -60,6 +65,122 @@ int servo_2=170;
 int servo_3=140;
 int servo_4=140;
 //-----------------------------------servo present values
+
+//---------------------------------------------------------------------------------------datalog--------V
+/* ---------- TIME ---------- */
+void get_time(char *buf) {
+    time_t now = time(NULL);
+    struct tm *t = localtime(&now);
+    sprintf(buf, "%04d-%02d-%02d %02d:%02d:%02d",
+            t->tm_year + 1900, t->tm_mon + 1, t->tm_mday,
+            t->tm_hour, t->tm_min, t->tm_sec);
+}
+
+/* ---------- INIT ---------- */
+void init_inventory() {
+    FILE *fp;
+
+    fp = fopen(DATA_FILE, "r");
+    if (!fp) {
+        fp = fopen(DATA_FILE, "w");
+        fprintf(fp, "item_id,action,time\n");
+    }
+    fclose(fp);
+
+    fp = fopen(COUNT_FILE, "r");
+    if (!fp) {
+        fp = fopen(COUNT_FILE, "w");
+        fprintf(fp, "item_id,count\n");
+    }
+    fclose(fp);
+
+    if (access(FIFO_PATH, F_OK) == -1) {
+        mkfifo(FIFO_PATH, 0666);
+    }
+}
+
+/* ---------- LOG EVENT ---------- */
+void log_event(const char *item, const char *action) {
+    FILE *fp = fopen(DATA_FILE, "a");
+    char timebuf[64];
+    get_time(timebuf);
+    fprintf(fp, "%s,%s,%s\n", item, action, timebuf);
+    fclose(fp);
+}
+
+/* ---------- STORE ---------- */
+void store_item(const char *item) {
+    FILE *fp = fopen(COUNT_FILE, "r");
+    FILE *temp = fopen(TEMP_FILE, "w");
+
+    char line[128], name[64];
+    int count, found = 0;
+
+    fgets(line, sizeof(line), fp); // header
+    fputs(line, temp);
+
+    while (fgets(line, sizeof(line), fp)) {
+        sscanf(line, "%[^,],%d", name, &count);
+
+        if (strcmp(name, item) == 0) {
+            count++;
+            found = 1;
+        }
+        fprintf(temp, "%s,%d\n", name, count);
+    }
+
+    if (!found) {
+        fprintf(temp, "%s,1\n", item);
+    }
+
+    fclose(fp);
+    fclose(temp);
+
+    remove(COUNT_FILE);
+    rename(TEMP_FILE, COUNT_FILE);
+
+    log_event(item, "STORE");
+    printf("? STORED: %s\n", item);
+}
+
+/* ---------- RETRIEVE ---------- */
+void retrieve_item(const char *item) {
+    FILE *fp = fopen(COUNT_FILE, "r");
+    FILE *temp = fopen(TEMP_FILE, "w");
+
+    char line[128], name[64];
+    int count, found = 0, success = 0;
+
+    fgets(line, sizeof(line), fp); // header
+    fputs(line, temp);
+
+    while (fgets(line, sizeof(line), fp)) {
+        sscanf(line, "%[^,],%d", name, &count);
+
+        if (strcmp(name, item) == 0) {
+            found = 1;
+            if (count > 0) {
+                count--;
+                success = 1;
+            }
+        }
+        fprintf(temp, "%s,%d\n", name, count);
+    }
+
+    fclose(fp);
+    fclose(temp);
+
+    remove(COUNT_FILE);
+    rename(TEMP_FILE, COUNT_FILE);
+
+    if (found && success) {
+        log_event(item, "RETRIEVE");
+        printf("?? RETRIEVED: %s\n", item);
+    } else {
+        printf("? NOT AVAILABLE: %s\n", item);
+    }
+}
+//---------------------------------------------------------------------------------------datalog-^
 
 
 
@@ -539,7 +660,15 @@ void on_output_mode_clicked(GtkButton *button, gpointer data)
     ir_error = 0;
 
 
-    fun();   // START SERVO THREADS
+    fun();
+
+    if (abort_motion == 0 && ir_error == 0) {
+        retrieve_item(product);
+        log_event(product, "RETRIEVE");
+        gtk_label_set_text(GTK_LABEL(label_status), "Retrieve Successful");
+    } else {
+        gtk_label_set_text(GTK_LABEL(label_status), "Retrieve Failed � Not Logged");
+    }
 }
 //------------------------------------------------------------------------------------servo--^
            
@@ -680,6 +809,17 @@ void input_mode() {
 			flush_fifo();
 			selectedMode=0;
 			fun();
+            /* ? LOG ONLY IF NO ERROR */
+    if (abort_motion == 0 && ir_error == 0) {
+        store_item(buffer);
+         log_event(buffer, "STORE");
+         printf("? Stored & Logged: %s\n", buffer);
+    } else {
+        printf("? Store failed � Not logged\n");
+    }
+
+    abort_motion = 0;
+    ir_error = 0;
 			flush_fifo();
         }
 
@@ -687,16 +827,49 @@ void input_mode() {
 			
 			selectedMode=1;
 			fun();
+            /* ? LOG ONLY IF NO ERROR */
+    if (abort_motion == 0 && ir_error == 0) {
+        store_item(buffer);
+         log_event(buffer, "STORE");
+         printf("? Stored & Logged: %s\n", buffer);
+    } else {
+        printf("? Store failed � Not logged\n");
+    }
+
+    abort_motion = 0;
+    ir_error = 0;
 			flush_fifo();
         }	
         else if (strcmp(buffer, "Hyderabad") == 0) {
 			selectedMode=2;
 			fun();
+            /* ? LOG ONLY IF NO ERROR */
+    if (abort_motion == 0 && ir_error == 0) {
+        store_item(buffer);
+         log_event(buffer, "STORE");
+         printf("? Stored & Logged: %s\n", buffer);
+    } else {
+        printf("? Store failed � Not logged\n");
+    }
+
+    abort_motion = 0;
+    ir_error = 0;
 			flush_fifo();
         }
         else if (strcmp(buffer, "Visakhapatnam") == 0) {
 			selectedMode=3;
 			fun();
+            /* ? LOG ONLY IF NO ERROR */
+    if (abort_motion == 0 && ir_error == 0) {
+        store_item(buffer);
+         log_event(buffer, "STORE");
+         printf("? Stored & Logged: %s\n", buffer);
+    } else {
+        printf("? Store failed � Not logged\n");
+    }
+
+    abort_motion = 0;
+    ir_error = 0;
 			flush_fifo();
         }
         else {
