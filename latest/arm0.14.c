@@ -931,10 +931,10 @@ void* input_mode() {
     time_t t = time(NULL);
     struct tm *tm_info = localtime(&t);
     const char *fifo_path = "/tmp/qrpipe";
+    stop_input_mode = 0;
 
 
     while (!stop_input_mode) {
-        stop_input_mode = 0;
         go_to_rest_position_1();
         FILE *fp = fopen(fifo_path, "r");
         if (!fp) perror("FIFO open error");
