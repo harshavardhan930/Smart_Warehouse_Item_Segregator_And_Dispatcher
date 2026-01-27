@@ -48,6 +48,8 @@ int speed1 = 30;
 int ledPin = 22;
 int ir_sensor = 26;
 
+volatile int e_button=1;
+
 int ir_error=0;
 int output_mode_check=0;
 
@@ -374,8 +376,10 @@ void emerg_button() {
     int buttonState = digitalRead(BUTTON);
 
     if (buttonState == LOW) {   
+        gtk_label_set_text(GTK_LABEL(label_status), "Emergency Stop restart the arm");
 
-        while (1) {
+        while (e_button) {
+            
         }
     }
 }
@@ -828,11 +832,12 @@ void stop_qr_script()
 gboolean on_window_close(GtkWidget *widget, GdkEvent *event, gpointer data)
 {
     printf("Window close clicked\n");
-
+        e_button=0;
     /* ---- STOP EVERYTHING CLEANLY ---- */
     stop_input_mode = 1;      // stop input thread
     abort_motion = 1;         // stop servos
     ir_error = 1;
+
 
     stop_qr_script();         // ?? STOP python qr3.py
 
