@@ -1,0 +1,4 @@
+all:
+        gcc arm0.14.c -o arm `pkg-config --cflags --libs gtk+-3.0` -lwiringPi -lpthread
+run:
+        sudo ./arm
