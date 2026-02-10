@@ -1,7 +1,7 @@
 # 📦 Smart Warehouse Item Segregator and Dispatcher
 
 An **ARM-based automated inventory management system** using a **robotic arm**, **QR code identification**, and a **Linux GUI application** running on a **Raspberry Pi**.  
-This project automates **storage, retrieval, segregation, dispatching, and real-time inventory tracking** of products.
+This project automates **storage, segregation, dispatching, and real-time inventory tracking** of products.
 
 ---
 
@@ -21,9 +21,16 @@ The system:
 
 ## 🧠 System Architecture
 
+### 📐 Architecture Diagram
+![System Architecture Diagram](images/arch.png)
+
+> The architecture shows the interaction between the camera, Python-based QR detection, FIFO-based IPC, WiringPi GPIO/PWM control, sensors, servos, and inventory log files running on the Raspberry Pi.
+
 ### Hardware Components
 - Raspberry Pi (ARM Processor)
 - Servo-based Robotic Arm (Multi-DOF)
+- IR Sensor
+- Electromagnet / Gripper
 - Relay Module
 - 5V SMPS Power Supply (HLK series)
 - QR Code Labels
@@ -32,10 +39,12 @@ The system:
 ### Software Components
 - Raspberry Pi OS (Linux)
 - C Programming
+- Python (QR Code Scanner)
 - GTK (GUI)
 - POSIX Threads (`pthread`)
-- IPC using FIFO (Named Pipes)
-- CSV files for inventory storage
+- IPC using FIFO (`mkfifo`)
+- WiringPi (GPIO & PWM)
+- CSV files for inventory logging
 
 ---
 
@@ -51,8 +60,6 @@ The system:
 |--------------|
 | ![Robotic Arm Close-Up](images/arm3.jpeg) |
 
-> The robotic arm performs pick-and-place operations for storage and dispatch based on QR code identification.
-
 ---
 
 ### ⚙️ Raspberry Pi Control Board
@@ -61,70 +68,82 @@ The system:
 |-----------------------------|
 | ![Raspberry Pi Control Board](images/pi.jpeg) |
 
-> Raspberry Pi acts as the central controller, handling GUI, IPC, file management, and robotic control.
+> Raspberry Pi acts as the central controller, managing GUI, IPC, file handling, sensor input, and servo control.
 
 ---
 
 ## 🖥️ GUI Interface Visualization
 
 ### 📊 Inventory Management GUI
+![GUI Screenshot](images/gui.jpeg)
 
-| GUI Dashboard |
-|---------------|
-| ![GUI Screenshot](images/gui.jpeg) |
-
-> The GUI allows the user to switch between input/output modes, monitor inventory status, and control operations.
+> The GTK-based GUI allows the user to select modes, enter product names, monitor inventory counts, and control system operation.
 
 ---
 
 ## 🔄 Working Flow
 
+### 🔁 Operational Flow Diagram
+![System Flow Diagram](images/flow.png)
+
+> This flowchart represents the complete working logic of the system, from initialization to item storage, retrieval, logging, and termination.
+
 ### 1️⃣ System Startup
 - Raspberry Pi boots into Linux
 - Main program initializes:
-  - GPIO pins
+  - GPIO and PWM
   - FIFO (Named Pipe)
   - GUI components
+  - Servo position data
   - Threads for motor control and file handling
+- Python QR scanner process is launched
 
 ---
 
 ### 2️⃣ Input Mode (Storage & Segregation)
-1. User enters the **Product Name** via the GUI
-2. QR code corresponding to the product is detected
-3. Product is identified and classified
-4. Robotic arm picks the product
-5. Product is placed in the assigned storage location
-6. Inventory count is updated and saved in a CSV file
+1. User selects **Input Mode**
+2. QR code is scanned using the camera
+3. Item is identified
+4. Robotic arm moves to storage position
+5. IR sensor confirms item placement
+6. STORE event is logged
+7. Inventory count is incremented
+8. Arm returns to rest position
 
 ---
 
-### 3️⃣ Output Mode (Dispatch Operation)
+### 3️⃣ Output Mode (Retrieval & Dispatch)
 1. User selects **Output Mode**
-2. Requested product is identified
-3. Robotic arm retrieves the product
-4. Product is dispatched
-5. Inventory count is decremented
-6. GUI updates inventory status in real time
+2. Item name is entered via GUI
+3. Inventory availability is checked
+4. QR code is scanned for verification
+5. Matching item is found
+6. Robotic arm retrieves the item
+7. RETRIEVE event is logged
+8. Inventory count is decremented
+9. Arm returns to rest position
 
 ---
 
 ### 4️⃣ Inter-Process Communication
-- GUI and control logic run as **separate processes**
-- Communication is handled using **FIFO (`mkfifo`)**
-- Ensures safe and synchronized data exchange
+- Python (QR Scanner) and C (Main Control) run as **separate processes**
+- Communication via **FIFO (`mkfifo`)**
+- Ensures synchronized and safe data exchange
 
 ---
 
 ## 🧵 Software Design
 
 ### Multi-Process Architecture
-- `fork()` is used to separate GUI and control logic
-- Improves system reliability and fault isolation
+- `fork()` is used to separate:
+  - GUI process
+  - Robotic control logic
+- Improves reliability and fault isolation
 
 ### Multi-Threading
-Threads are used to handle:
+Threads handle:
 - Servo motor movement
+- Sensor monitoring
 - Inventory file read/write operations
 - GUI responsiveness
 
@@ -148,12 +167,10 @@ Threads are used to handle:
 ## ✨ Key Features
 
 - Automated item segregation and dispatch
+- QR code-based identification
 - Real-time inventory tracking
 - ARM-based embedded Linux system
 - GUI-controlled operation
 - FIFO-based inter-process communication
 - Multi-threaded robotic control
-- Scalable and modular design
-
----
-
+- Modular and scalable design
