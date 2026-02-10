@@ -45,7 +45,7 @@ The system:
 
 | Front View | Side View |
 |-----------|----------|
-| ![Robotic Arm Front](images/arm1.jpeeg) | ![Robotic Arm Side](images/arm2.jpeg) |
+| ![Robotic Arm Front](images/arm1.jpeg) | ![Robotic Arm Side](images/arm2.jpeg) |
 
 | Close-Up View |
 |--------------|
