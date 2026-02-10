@@ -38,9 +38,26 @@ The system:
 
 ---
 
-## 🖼️ Project Images
+## 🖼️ Hardware Setup
 
-Hardware setup, robotic arm operation, Raspberry Pi control board, and GUI screenshots are available in the `images/` directory.
+### Robotic Arm and Storage Area
+![Robotic Arm Setup](images/arm1.jpg)
+
+![Robotic Arm Side View](images/arm2.jpg)
+
+![Robotic Arm Close-Up](images/arm3.jpg)
+
+---
+
+### Raspberry Pi Control Board
+![Raspberry Pi Control Board](images/pi.jpg)
+
+---
+
+## 🖥️ GUI Interface
+
+### Inventory Management GUI
+![GUI Screenshot](images/gui.jpg)
 
 ---
 
@@ -119,3 +136,5 @@ Threads are used to handle:
 - FIFO-based inter-process communication
 - Multi-threaded robotic control
 - Scalable and modular design
+
+---
