@@ -119,5 +119,3 @@ Threads are used to handle:
 - FIFO-based inter-process communication
 - Multi-threaded robotic control
 - Scalable and modular design
-    ├── gui.jpg
-    └── pi.jpg
