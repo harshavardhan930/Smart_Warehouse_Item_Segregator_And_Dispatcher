@@ -1,19 +1,20 @@
-# 📦 Automated Storage and Retrieval Inventory Management System
+# 📦 Smart Warehouse Item Segregator and Dispatcher
 
 An **ARM-based automated inventory management system** using a **robotic arm**, **QR code identification**, and a **Linux GUI application** running on a **Raspberry Pi**.  
-This project automates **storage, retrieval, and real-time inventory tracking** of products.
+This project automates **storage, retrieval, segregation, dispatching, and real-time inventory tracking** of products.
 
 ---
 
 ## 🔍 Project Overview
 
 Manual inventory management is slow, error-prone, and requires continuous human intervention.  
-This project demonstrates how **embedded Linux**, **inter-process communication (IPC)**, and **robotic automation** can be integrated to build a **smart inventory management system**.
+This project demonstrates how **embedded Linux**, **inter-process communication (IPC)**, and **robotic automation** can be integrated to build a **smart warehouse system**.
 
 The system:
 - Identifies products using **QR codes**
+- Segregates and dispatches items automatically
 - Stores and retrieves items using a **robotic arm**
-- Automatically updates inventory count
+- Updates inventory count in real time
 - Provides a **GUI-based interface** for user interaction
 
 ---
@@ -38,26 +39,41 @@ The system:
 
 ---
 
-## 🖼️ Hardware Setup
+## 🖼️ Hardware Setup & Visualization
 
-### Robotic Arm and Storage Area
-![Robotic Arm Setup](images/arm1.jpg)
+### 🔧 Robotic Arm Assembly and Operation
 
-![Robotic Arm Side View](images/arm2.jpg)
+| Front View | Side View |
+|-----------|----------|
+| ![Robotic Arm Front](images/arm1.jpeeg) | ![Robotic Arm Side](images/arm2.jpeg) |
 
-![Robotic Arm Close-Up](images/arm3.jpg)
+| Close-Up View |
+|--------------|
+| ![Robotic Arm Close-Up](images/arm3.jpeg) |
+
+> The robotic arm performs pick-and-place operations for storage and dispatch based on QR code identification.
 
 ---
 
-### Raspberry Pi Control Board
-![Raspberry Pi Control Board](images/pi.jpg)
+### ⚙️ Raspberry Pi Control Board
+
+| Raspberry Pi & Power Module |
+|-----------------------------|
+| ![Raspberry Pi Control Board](images/pi.jpeg) |
+
+> Raspberry Pi acts as the central controller, handling GUI, IPC, file management, and robotic control.
 
 ---
 
-## 🖥️ GUI Interface
+## 🖥️ GUI Interface Visualization
 
-### Inventory Management GUI
-![GUI Screenshot](images/gui.jpg)
+### 📊 Inventory Management GUI
+
+| GUI Dashboard |
+|---------------|
+| ![GUI Screenshot](images/gui.jpeg) |
+
+> The GUI allows the user to switch between input/output modes, monitor inventory status, and control operations.
 
 ---
 
@@ -73,21 +89,23 @@ The system:
 
 ---
 
-### 2️⃣ Input Mode (Storage Operation)
-1. User enters the **Product Name** through the GUI
+### 2️⃣ Input Mode (Storage & Segregation)
+1. User enters the **Product Name** via the GUI
 2. QR code corresponding to the product is detected
-3. Robotic arm picks the product
-4. Product is placed in the assigned storage slot
-5. Inventory count is incremented and saved in a CSV file
+3. Product is identified and classified
+4. Robotic arm picks the product
+5. Product is placed in the assigned storage location
+6. Inventory count is updated and saved in a CSV file
 
 ---
 
-### 3️⃣ Output Mode (Retrieval Operation)
+### 3️⃣ Output Mode (Dispatch Operation)
 1. User selects **Output Mode**
 2. Requested product is identified
 3. Robotic arm retrieves the product
-4. Inventory count is decremented
-5. GUI updates inventory status in real time
+4. Product is dispatched
+5. Inventory count is decremented
+6. GUI updates inventory status in real time
 
 ---
 
@@ -102,7 +120,7 @@ The system:
 
 ### Multi-Process Architecture
 - `fork()` is used to separate GUI and control logic
-- Improves system reliability and modularity
+- Improves system reliability and fault isolation
 
 ### Multi-Threading
 Threads are used to handle:
@@ -123,13 +141,13 @@ Threads are used to handle:
 - Product name entry
 - STOP and Idle control
 - Live inventory table
-- User-friendly GTK-based interface
+- GTK-based user-friendly interface
 
 ---
 
 ## ✨ Key Features
 
-- Automated storage and retrieval
+- Automated item segregation and dispatch
 - Real-time inventory tracking
 - ARM-based embedded Linux system
 - GUI-controlled operation
@@ -138,3 +156,4 @@ Threads are used to handle:
 - Scalable and modular design
 
 ---
+
